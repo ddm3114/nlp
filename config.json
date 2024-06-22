@@ -1,0 +1,58 @@
+[
+    {
+        "id": "bert_1",
+        "dataset":"text_classification",
+        "data_root":"dataset/all_cases.json",
+        "data_type":"text",
+        "augment": false,
+        
+        "model": "Bert",
+        "pretrained": true,
+        "optimizer":"Adam",
+        "loss_f":"cross_entropy",
+        "autocast" : true,
+
+        "batch_size": 128,
+        "lr_head": 0.01,
+        "train_backbone": false,
+        "lr_backbone": 0.01,
+        "step_size":3,
+        "gamma":0.316,
+        "weight_decay": 1e-4,  
+
+        "epochs": 12,
+        "num_classes":12,
+        "hidden_dim": 1024,
+
+        "save_dir": "text_classification/Bert1",
+        "load_dir": ""
+    },{
+        "id": "roberta_1",
+        "dataset":"text_classification",
+        "data_root":"dataset/all_cases.json",
+        "data_type":"text",
+        "augment": false,
+        
+        "model": "RoBerta",
+        "pretrained": true,
+        "optimizer":"Adam",
+        "loss_f":"cross_entropy",
+        "autocast" : true,
+
+        "batch_size": 128,
+        "lr_head": 0.01,
+        "train_backbone": false,
+        "lr_backbone": 0.01,
+        "step_size":3,
+        "gamma":0.316,
+        "weight_decay": 1e-4,  
+
+        "epochs": 12,
+        "num_classes":12,
+        "hidden_dim": 1024,
+
+        "save_dir": "text_classification/RoBerta1",
+        "load_dir": ""
+    }
+
+] 
