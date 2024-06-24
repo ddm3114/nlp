@@ -1,6 +1,6 @@
 import torch
 from PIL import Image
-
+import tqdm
 
 from torch.utils.tensorboard import SummaryWriter
 if torch.cuda.is_available():
@@ -69,7 +69,6 @@ def train(hyperparameters):
     optimizer = get_optim(model,lr_head,lr_backbone,weight_decay,train_backbone,optim=optim)
 
     scheduler = lr_scheduler.StepLR(optimizer, step_size=step_size, gamma=gamma)
-
     criterion = torch.nn.CrossEntropyLoss()
     train_loss = []
     val_loss = []
@@ -78,6 +77,7 @@ def train(hyperparameters):
     for name, parms in model.named_parameters():
             print('-->name:', name, '-->grad_requirs:', parms.requires_grad, '--weight', torch.mean(parms.data))
             # print('-->name:', name, '-->grad_requirs:', parms.requires_grad, '--weight', torch.mean(parms.data),'-->grad_value:', torch.mean(parms.grad)) 
+    patience = 3
 
     for epoch in range(epochs):
         model.train()
@@ -87,7 +87,8 @@ def train(hyperparameters):
         train_iter = 0
         print('Training train data')
         if epoch % step_size == 0:
-            print(f'[Train]lr changed to {scheduler.get_last_lr()}')
+            print(f'[Train]lr is {scheduler.get_last_lr()}')
+        train_dataloader = tqdm.tqdm(train_dataloader,desc="Training epoch:{}".format(epoch),position=0,leave=False)
         for iter,sample in enumerate(train_dataloader):
             train_iter= iter
             if isinstance(sample[0][0], str) and data_type == 'image':
@@ -100,7 +101,7 @@ def train(hyperparameters):
                 img,label = process_text(sample,model_name)
             else:
                 raise TypeError(f"'{type(model).__name__}' object has wrong type either str or torch.Tensor'")
-        
+
             img = img.to(device)
             label = label.to(device)
 
@@ -109,14 +110,19 @@ def train(hyperparameters):
                 with autocast():
                     output = model(img)
                     loss = criterion(output, label)
+                
                 scaler.scale(loss).backward()
+                torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
                 scaler.step(optimizer)
                 scaler.update()
+                
             else:
                 output = model(img)
                 loss = criterion(output, label)
                 loss.backward()
+                torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
                 optimizer.step()
+                
             train_loss_epoch.append(loss.item())
             accuracy = (output.argmax(1) == label).sum().item()/len(label)
             train_accuracy_epoch.append(accuracy)
@@ -125,8 +131,8 @@ def train(hyperparameters):
                 iter_loss = sum(train_loss_epoch[iter-100:iter])/100
                 print(f'[Training]epoch:{epoch},iter:{iter},loss: {iter_loss}')
                 for name, parms in model.named_parameters():
-                    if parms.grad is None and parms.requires_grad:
-                        raise ValueError(f'[Training]layer:{name} grad is None')
+                    if parms.grad is None and parms.requires_grad :
+                        print(f"[warning]grad of {name} is None")
 
             del img
             del label
@@ -192,7 +198,7 @@ def train(hyperparameters):
             else:
                 output = model(img)
                 loss = criterion(output, label)
-                
+
             accuracy = (output.argmax(1) == label).sum().item()/len(label)
             val_loss_epoch.append(loss.item())
             val_accuracy_epoch.append(accuracy)
@@ -203,14 +209,39 @@ def train(hyperparameters):
         epoch_loss = sum(val_loss_epoch)/len(val_loss_epoch)
         epoch_accuracy = sum(val_accuracy_epoch)/len(val_accuracy_epoch)
 
-        val_loss.append(epoch_loss)
-        accuracy_list.append(epoch_accuracy)
+       
+       
+        
+
+        val_loss.append(epoch_loss)    
+        
 
         writer.add_scalar('val Loss', epoch_loss, epoch)
         writer.add_scalar('val Accuracy', epoch_accuracy, epoch)
         
         print(f'[val]val loss: {sum(val_loss_epoch)/len(val_loss_epoch)}')
         print(f'[val]accuracy: {epoch_accuracy}')
+
+        if epoch != 0:
+            if epoch_accuracy > max(accuracy_list):
+                save_dict(model,hyperparameters,epoch=epoch)
+                print(f'[val]model saved at epoch:{epoch}')
+            if epoch_accuracy <= max(accuracy_list):
+                patience -= 1
+                if patience == 0:
+                    print(f'[val]early stopping at epoch:{epoch}')
+                    accuracy_list.append(epoch_accuracy)
+                    print('-'*50)
+                    writer.close()
+                    print("you can use '$ tensorboard --logdir=runs' to manage your model")
+                    break
+            else:
+                patience = 3
+        else:
+            save_dict(model,hyperparameters,epoch=epoch)
+            print(f'[val]model saved at epoch:{epoch}')
+
+        accuracy_list.append(epoch_accuracy)
         print('-'*50)
 
     if save_model:

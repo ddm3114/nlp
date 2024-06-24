@@ -13,6 +13,9 @@ torch.autograd.set_detect_anomaly(True)
 import torchvision.transforms as transforms
 from torchvision.datasets import CIFAR100,CIFAR10
 from torch.utils.data import DataLoader,Dataset
+import random
+from collections import defaultdict
+from typing import List, Dict
 
 class Augmentation_Dataset:
     def __init__(self,dataset,transform=None):
@@ -108,6 +111,8 @@ class My_Dataset:
         self.data_root = data_root
         with open(data_root,'r',encoding='utf-8') as f:
             datas = json.load(f)
+        # datas = self.oversample_data(datas)
+
         self.length = len(datas)
         self.label_list = ['刷单返利类',
                            '虚假网络投资理财类',
@@ -129,7 +134,27 @@ class My_Dataset:
         self.test_dataset = Custom_Dataset(datas[int(0.98*self.length):],self.label_list)
         self.num_classes = self.label_len
 
+    def oversample_data(self, data_list: List[Dict[str, int]], max_count: int = 10000) -> List[Dict[str, int]]:
+    # 按照标签分组数据
+        label_to_data = defaultdict(list)
+        for item in data_list:
+            label_to_data[item['案件类别']].append(item)
 
+        # 对每个标签进行过采样或欠采样
+        balanced_data_list = []
+        for label, items in label_to_data.items():
+            if len(items) < max_count:
+                oversampled_items = random.choices(items, k=max_count - len(items))
+                items.extend(oversampled_items)
+            balanced_data_list.extend(items)
+        label_to_data = defaultdict(list)
+        for item in balanced_data_list:
+            label_to_data[item['案件类别']].append(item)
+        for label, items in label_to_data.items():
+            print(f"标签: {label}, 样本数: {len(items)}")
+
+        return balanced_data_list
+    
 if __name__ == '__main__':
     # dataset = CIFAR100_Dataset(transform=transform)
     # train_dataset,test_dataset = dataset.train_dataset,dataset.test_dataset
@@ -148,9 +173,10 @@ if __name__ == '__main__':
     #     show_image(img[0],img_pth)
     #     print("label:",label[0])
     #     break
-    data_root = 'dataset/train.json'
+    data_root = 'dataset/all_cases.json'
     dataset = My_Dataset(data_root)
     train_dataset = dataset.train_dataset
+    print(train_dataset.__getitem__(2))
     print(len(train_dataset))
     val_dataset = dataset.val_dataset
     print(len(val_dataset))

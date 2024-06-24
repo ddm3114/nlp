@@ -9,6 +9,7 @@ import matplotlib.pyplot as plt
 import json
 import bert
 import roberta
+from transformers import BertTokenizer
 if torch.cuda.is_available():
     device = torch.device('cuda')
 
@@ -63,8 +64,14 @@ transform = transforms.Compose([
 
 
 
-def save_dict(model,config):
+def save_dict(model,config,**args):
     os.makedirs(config['save_dir'],exist_ok=True)
+    if 'epoch' in args:
+        epoch = args['epoch']
+        save_path = os.path.join(config['save_dir'],f'model_{epoch}.pth')
+        torch.save(model.state_dict(),save_path)
+        print(f'Model saved to {save_path}')
+        return
     save_path = os.path.join(config['save_dir'],'model.pth')
     torch.save(model.state_dict(),save_path)
 

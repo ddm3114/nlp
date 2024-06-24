@@ -13,7 +13,7 @@ import json
 def inference(config,batch=10):
     device = "cuda"
     data_root = config['data_root']
-    load_path = os.path.join(config['save_dir'],'model.pth')
+    load_path = os.path.join(config['save_dir'],'model_best.pth')
 
     dataset = My_Dataset(data_root)
     label_list = dataset.label_list
@@ -38,14 +38,18 @@ def inference(config,batch=10):
         labels = labels.to(device)
         outputs = model(imgs)
         _,pred = torch.max(outputs,1)
+        acc = torch.sum(pred == labels).item()/len(labels)
         pred_label = [label_list[p] for p in pred]
         labels = [label_list[l] for l in labels]
-        for i in range(len(pred_label)):
-            print(f"<{i}>对于案件:'{raw_text[i][:50]}',\n模型预测为'{pred_label[i]}',\n实际为'{labels[i]}'\n")
+        
+        for k in range(len(pred_label)):
+            print(f"<{k}>对于案件:'{raw_text[i][:50]}',\n模型预测为'{pred_label[i]}',\n实际为'{labels[i]}'\n预测:{'√' if pred_label[k] == labels[k] else '×'}")
+        print(f"第{i}批次准确率为{acc}")
+        print('-'*50)
         break
 
 if __name__ == '__main__':
-    path =[ 'text_classification/Bert1/config.json','text_classification/RoBerta1/config.json']
+    path =[ 'text_classification/Bert/config.json','text_classification/RoBerta/config.json']
     for p in path:
         with open(p) as f:
             config = json.load(f)

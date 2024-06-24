@@ -5,11 +5,10 @@ from torchvision.models import densenet121,DenseNet121_Weights,densenet161,Dense
 from torchvision.models import resnet18,ResNet18_Weights,resnet34,ResNet34_Weights,resnet50,ResNet50_Weights,resnet101,ResNet101_Weights,resnet152,ResNet152_Weights
 
 from torchvision.models import swin_t,Swin_T_Weights
-from bert import bert
-from roberta import roberta
+import bert
+import roberta
 from torch import nn
 import torch.nn.init as init
-
 import torch.nn.functional as F
 if torch.cuda.is_available():
     device = torch.device('cuda')
@@ -22,46 +21,46 @@ torch.autograd.set_detect_anomaly(True)
 # class ClassifierHead(nn.Module):
 #     def __init__(self, in_features,hidden_dim = 1024, num_classes=1024):
 #         super(ClassifierHead, self).__init__()
-#         self.layer = nn.Sequential(
-#             nn.Linear(in_features, 512),
-#             nn.ReLU(),
-#             nn.Linear(512, num_classes)
-#         )
+#         self.fc1 = nn.Linear(in_features, in_features, bias=True)
+#         self.tanh = nn.Tanh()
+#         self.dropout = nn.Dropout(0.1, inplace=False)
+#         self.fc2 = nn.Linear(in_features, num_classes, bias=True)
+#         self._initialize_weights()
 
 #     def forward(self, x):
-#         x = self.layer(x)
+#         x = self.fc1(x)
+#         x = self.tanh(x)
+#         x = self.dropout(x)
+#         x = self.fc2(x)
         
 #         return x
+    
+#     def _initialize_weights(self):
+#         for m in self.modules():
+#             if isinstance(m, nn.Conv2d):
+#                 # He 初始化 (Kaiming 初始化)
+#                 init.kaiming_normal_(m.weight, mode='fan_out', nonlinearity='relu')
+#                 if m.bias is not None:
+#                     init.constant_(m.bias, 0)
+#             elif isinstance(m, nn.Linear):
+#                 # Xavier 初始化 (Glorot 初始化)
+#                 init.xavier_normal_(m.weight)
+#                 if m.bias is not None:
+#                     init.constant_(m.bias, 0)
+#             elif isinstance(m, nn.BatchNorm2d):
+#                 init.constant_(m.weight, 1)
+#                 init.constant_(m.bias, 0)
 
 class ClassifierHead(nn.Module):
     def __init__(self, in_features,hidden_dim = 1024, num_classes=1024):
         super(ClassifierHead, self).__init__()
-        self.fc1 = nn.Linear(in_features, hidden_dim)
-        self.bn1 = nn.BatchNorm1d(hidden_dim)
-        self.dropout1 = nn.Dropout(0.5)
-        self.fc2 = nn.Linear(hidden_dim, hidden_dim)
-        self.bn2 = nn.BatchNorm1d(hidden_dim)
-        self.dropout2 = nn.Dropout(0.5)
-        self.fc3 = nn.Linear(hidden_dim, num_classes)
-        self.residual = nn.Linear(in_features, num_classes)
+        self.fc = nn.Linear(in_features, num_classes, bias=True)
+        
         self._initialize_weights()
 
     def forward(self, x):
-        identity = self.residual(x)
-        
-        x = self.fc1(x)
-        x = self.bn1(x)
-        x = nn.ReLU()(x)
-        x = self.dropout1(x)
-        
-        x = self.fc2(x)
-        x = self.bn2(x)
-        x = nn.ReLU()(x)
-        x = self.dropout2(x)
-        
-        x = self.fc3(x)
-        
-        x += identity  # Residual connection
+
+        x = self.fc(x)
         
         return x
     
@@ -146,13 +145,13 @@ class baseModel(torch.nn.Module):
 
         elif model_name == 'Bert':
             if pretrained  == True:
-                model = bert("Bert/chinese")
+                model = bert.bert("Bert/chinese")
             else:
                 raise ValueError(f'only pretrained model available for this model: {model_name}')
             print('bert model loaded')
         elif model_name == 'RoBerta':
             if pretrained  == True:
-                model = roberta("RoBerta/chinese")
+                model = roberta.roberta("RoBerta/chinese")
             else:
                 raise ValueError(f'only pretrained model available for this model: {model_name}')
             print('RoBerta model loaded')
@@ -264,8 +263,12 @@ class MyModel(nn.Module):
     
 if __name__ == "__main__":
     
-    model = baseModel(model_name='RoBerta',pretrained=True,train_backbone=False,hidden_dim=1024,num_classes=200)   
+    model = baseModel(model_name='RoBerta',pretrained=True,train_backbone=False,hidden_dim=1024,num_classes=12)   
     print(model)
+    datas = ["你叫什么名字", "我叫张三"]
+    datas = roberta.process(datas)
+    outputs = model(datas)
+    print(outputs.shape)
     
     # print("swin_t: ", sum(p.numel() for p in model.parameters()))
     # model = ResNet50(pretrained= False)
